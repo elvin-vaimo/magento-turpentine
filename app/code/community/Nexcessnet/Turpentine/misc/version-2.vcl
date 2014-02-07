@@ -240,6 +240,12 @@ sub vcl_hash {
         set req.hash += regsub(req.http.Cookie, "^.*?frontend=([^;]*);*.*$", "\1");
         {{advanced_session_validation}}
     }
+
+    # add gtypid Cookie to hash
+    if (req.http.Cookie ~ "gtypeid=") {
+        set req.hash += regsub(req.http.Cookie, "^.*?gtypeid=([^;]*);*.*$", "\1");
+    }
+
     return (hash);
 }
 

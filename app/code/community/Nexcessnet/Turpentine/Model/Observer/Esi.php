@@ -207,6 +207,8 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
                 $hmacParam      => $dataHelper->getHmac( $frozenData ),
                 $dataParam      => $frozenData,
             );
+            #Mage::log($esiOptions,null,  'varnish.log');
+            #Mage::log($esiData,null,  'varnish.log');
             if( $esiOptions[$methodParam] == 'ajax' ) {
                 $urlOptions['_secure'] = Mage::app()->getStore()
                     ->isCurrentlySecure();
@@ -288,6 +290,26 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
                 'Invalid registry_keys for block: %s',
                 $blockObject->getNameInLayout() );
         }
+        $callbackValues = array();
+        if( is_array( $esiOptions['callback_methods'] ) ) {
+            foreach( $esiOptions['callback_methods'] as $method => $options ) {
+                $callMethod = 'get'.uc_words($method, '');
+                $value = call_user_func_array(array($blockObject, $callMethod), (array) $options);
+                Mage::log(get_class($blockObject).'->'.$callMethod.'() = '.$value, null, 'varnish.log');
+                if( $value ) {
+                    if( is_object( $value ) &&
+                            $value instanceof Mage_Core_Model_Abstract ) {
+                        $callbackValues[$method] =
+                            $this->_getComplexRegistryData( $options, $value );
+                    } else {
+                        $callbackValues[$method] = $value;
+                    }
+                }
+            }
+        }
+
+
+        $esiData->setCallbackValues( $callbackValues );
         $esiData->setSimpleRegistry( $simpleRegistry );
         $esiData->setComplexRegistry( $complexRegistry );
         Varien_Profiler::stop( 'turpentine::observer::esi::_getEsiData' );
@@ -361,6 +383,7 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
             $esiHelper->getEsiCacheTypeParam()      => 'public',
             'dummy_blocks'      => array(),
             'registry_keys'     => array(),
+            'callback_methods'     => array(),
         );
         $options = array_merge( $defaults, $options );
 

@@ -175,6 +175,13 @@ class Nexcessnet_Turpentine_EsiController extends Mage_Core_Controller_Front_Act
                 }
             }
             $block = $layout->getBlock( $esiData->getNameInLayout() );
+
+            foreach( $esiData->getCallbackValues() as $key => $value ) {
+                $callMethod = 'set'.uc_words($key, '');
+                Mage::log(get_class($block).'->'.$callMethod.'("'.$value.'")', null, 'varnish.log');
+                call_user_func_array(array($block, $callMethod), array($value));
+            }
+
         } else {
             Mage::helper( 'turpentine/debug' )->logWarn(
                 'No block node found with @name="%s"',

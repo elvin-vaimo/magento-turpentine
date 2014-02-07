@@ -109,7 +109,9 @@ sub vcl_recv {
     # We only deal with GET and HEAD by default
     # we test this here instead of inside the url base regex section
     # so we can disable caching for the entire site if needed
-    if (!{{enable_caching}} || req.http.Authorization ||
+    #if (!{{enable_caching}} || req.http.Authorization ||
+
+    if (!{{enable_caching}} ||
         req.request !~ "^(GET|HEAD)$" ||
         req.http.Cookie ~ "varnish_bypass={{secret_handshake}}") {
         return (pipe);
@@ -235,8 +237,13 @@ sub vcl_hash {
             req.http.Cookie ~ "frontend=") {
         hash_data(regsub(req.http.Cookie, "^.*?frontend=([^;]*);*.*$", "\1"));
         {{advanced_session_validation}}
-
     }
+
+    # add gtypid Cookie to hash
+    if (req.http.Cookie ~ "gtypeid=") {
+        hash_data(regsub(req.http.Cookie, "^.*?gtypeid=([^;]*);*.*$", "\1"));
+    }
+
     return (hash);
 }
 

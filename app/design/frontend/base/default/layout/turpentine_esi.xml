@@ -36,7 +36,7 @@
         message and the number of items in the shopping cart so it must be
         cached per-client.
         -->
-        <reference name="header">
+        <!--reference name="header">
             <action method="setEsiOptions">
                 <params>
                     <access>private</access>
@@ -47,7 +47,7 @@
                     </flush_events>
                 </params>
             </action>
-        </reference>
+        </reference-->
         <!-- This block is inside of the header block on mage EE, so it could
         be commented out for EE stores for a small performance increase -->
         <reference name="cart_sidebar">
