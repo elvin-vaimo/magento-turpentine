@@ -240,11 +240,11 @@ sub vcl_hash {
 
     }
 
-    if (req.http.X-Varnish-Esi-Access == "customer_group" &&
-            req.http.Cookie ~ "customer_group=") {
+    ## req.http.X-Varnish-Esi-Access == "customer_group" &&
+    if (req.http.Cookie ~ "customer_group=") {
         hash_data(regsub(req.http.Cookie, "^.*?customer_group=([^;]*);*.*$", "\1"));
     }
-    
+
     return (hash);
 }
 
