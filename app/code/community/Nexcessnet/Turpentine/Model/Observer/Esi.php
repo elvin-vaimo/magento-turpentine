@@ -180,10 +180,12 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
     public function setReplaceFormKeyFlag( $eventObject ) {
         $esiHelper = Mage::helper( 'turpentine/esi' );
         $varnishHelper = Mage::helper( 'turpentine/varnish' );
+        /** @var Mage_Core_Controller_Request_Http $request */
         $request = Mage::app()->getRequest();
-        if( $esiHelper->shouldResponseUseEsi() &&
-                $varnishHelper->csrfFixupNeeded() &&
-                !$request->isPost() ) {
+        if( !$request->isPost() &&
+            strpos($request->getRequestString(), '/checkout/') === false &&
+            $esiHelper->shouldResponseUseEsi() &&
+                $varnishHelper->csrfFixupNeeded()) {
             Mage::register( 'replace_form_key', true );
         }
     }
