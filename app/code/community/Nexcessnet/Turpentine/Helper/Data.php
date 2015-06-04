@@ -359,4 +359,17 @@ class Nexcessnet_Turpentine_Helper_Data extends Mage_Core_Helper_Abstract {
     protected function _getCryptKey() {
         return (string)Mage::getConfig()->getNode( 'global/crypt/key' );
     }
+
+    /**
+     * Get increasing counter for AJAX placeholders
+     *
+     * @return int
+     */
+    public function getAjaxBlockCounter()
+    {
+        static $counter = 0;
+        $counter++;
+
+        return $counter;
+    }
 }
