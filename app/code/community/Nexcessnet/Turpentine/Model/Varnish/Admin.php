@@ -40,8 +40,7 @@ class Nexcessnet_Turpentine_Model_Varnish_Admin {
      * @return bool
      */
     public function flushUrl( $subPattern ) {
-        $result      = array();
-        $clearedFlag = false;
+        $result = array();
         foreach( Mage::helper( 'turpentine/varnish' )->getSockets() as $socket ) {
             $socketName = $socket->getConnectionString();
             try {
@@ -53,17 +52,7 @@ class Nexcessnet_Turpentine_Model_Varnish_Admin {
                 continue;
             }
             $result[$socketName] = true;
-            $clearedFlag         = true;
         }
-
-        if ($clearedFlag) {
-            try {
-                Mage::getModel('turpentine/urlCacheStatus')->expireByRegex($subPattern);
-            } catch (Exception $e) {
-                Mage::logException($e);
-            }
-        }
-
         return $result;
     }
 
