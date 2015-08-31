@@ -27,7 +27,6 @@ class Nexcessnet_Turpentine_Model_Varnish_Admin {
     /**
      * Flush all Magento URLs in Varnish cache
      *
-     * @param  Nexcessnet_Turpentine_Model_Varnish_Configurator_Abstract $cfgr
      * @return bool
      */
     public function flushAll() {
@@ -37,13 +36,11 @@ class Nexcessnet_Turpentine_Model_Varnish_Admin {
     /**
      * Flush all Magento URLs matching the given (relative) regex
      *
-     * @param  Nexcessnet_Turpentine_Model_Varnish_Configurator_Abstract $cfgr
-     * @param  string $pattern regex to match against URLs
+     * @param  string $subPattern regex to match against URLs
      * @return bool
      */
     public function flushUrl( $subPattern ) {
-        $result      = array();
-        $clearedFlag = false;
+        $result = array();
         foreach( Mage::helper( 'turpentine/varnish' )->getSockets() as $socket ) {
             $socketName = $socket->getConnectionString();
             try {
@@ -55,17 +52,7 @@ class Nexcessnet_Turpentine_Model_Varnish_Admin {
                 continue;
             }
             $result[$socketName] = true;
-            $clearedFlag         = true;
         }
-
-        if ($clearedFlag) {
-            try {
-                Mage::getModel('turpentine/urlCacheStatus')->expireByRegex($subPattern);
-            } catch (Exception $e) {
-                Mage::logException($e);
-            }
-        }
-
         return $result;
     }
 
@@ -105,7 +92,6 @@ class Nexcessnet_Turpentine_Model_Varnish_Admin {
     /**
      * Generate and apply the config to the Varnish instances
      *
-     * @param  Nexcessnet_Turpentine_Model_Varnish_Configurator_Abstract $cfgr
      * @return bool
      */
     public function applyConfig() {
@@ -184,7 +170,7 @@ class Nexcessnet_Turpentine_Model_Varnish_Admin {
             if ( $result===false ) {
                 // error
                 Mage::helper( 'turpentine/debug' )->logWarn(
-                    'Failed to parse param.show output to check esi_syntax value' );
+                    sprintf('Failed to parse param.show output to check %s value', $paramName ) );
                 $result = true;
             }
         } else {

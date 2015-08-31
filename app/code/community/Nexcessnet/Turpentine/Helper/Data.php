@@ -270,6 +270,16 @@ class Nexcessnet_Turpentine_Helper_Data extends Mage_Core_Helper_Abstract {
             'turpentine_varnish/general/auto_apply_on_save' );
     }
 
+    /**
+     * Get config value specifying when to strip VCL whitespaces
+     *
+     * @return string
+     */
+    public function getVclFix() {
+        return Mage::getStoreConfig(
+            'turpentine_varnish/general/vcl_fix' );
+    }
+
 	/**
 	 * Get config value specifying when to strip VCL whitespaces
 	 *
@@ -358,18 +368,5 @@ class Nexcessnet_Turpentine_Helper_Data extends Mage_Core_Helper_Abstract {
      */
     protected function _getCryptKey() {
         return (string)Mage::getConfig()->getNode( 'global/crypt/key' );
-    }
-
-    /**
-     * Get increasing counter for AJAX placeholders
-     *
-     * @return int
-     */
-    public function getAjaxBlockCounter()
-    {
-        static $counter = 0;
-        $counter++;
-
-        return $counter;
     }
 }

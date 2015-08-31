@@ -180,12 +180,10 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
     public function setReplaceFormKeyFlag( $eventObject ) {
         $esiHelper = Mage::helper( 'turpentine/esi' );
         $varnishHelper = Mage::helper( 'turpentine/varnish' );
-        /** @var Mage_Core_Controller_Request_Http $request */
         $request = Mage::app()->getRequest();
-        if( !$request->isPost() &&
-            strpos($request->getRequestString(), '/checkout/') === false &&
-            $esiHelper->shouldResponseUseEsi() &&
-                $varnishHelper->csrfFixupNeeded()) {
+        if( $esiHelper->shouldResponseUseEsi() &&
+                $varnishHelper->csrfFixupNeeded() &&
+                !$request->isPost() ) {
             Mage::register( 'replace_form_key', true );
         }
     }
@@ -227,7 +225,7 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
         if( $esiHelper->getEsiBlockLogEnabled() ) {
             $debugHelper->logInfo(
                 'Checking ESI block candidate: %s',
-                $blockObject->getNameInLayout() );
+                $blockObject->getNameInLayout() ? $blockObject->getNameInLayout() : $blockObject->getModuleName() );
         }
         if( $esiHelper->shouldResponseUseEsi() &&
                 $blockObject instanceof Mage_Core_Block_Template &&
@@ -236,11 +234,11 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
                 // admin blocks are not allowed to be cached for now
                 $debugHelper->logWarn(
                     'Ignoring attempt to inject adminhtml block: %s',
-                    $blockObject->getNameInLayout() );
+                    $blockObject->getNameInLayout() ? $blockObject->getNameInLayout() : $blockObject->getModuleName() );
                 return;
             } elseif( $esiHelper->getEsiBlockLogEnabled() ) {
                 $debugHelper->logInfo( 'Block check passed, injecting block: %s',
-                    $blockObject->getNameInLayout() );
+                    $blockObject->getNameInLayout() ? $blockObject->getNameInLayout() : $blockObject->getModuleName() );
             }
             Varien_Profiler::start( 'turpentine::observer::esi::injectEsi' );
             $ttlParam = $esiHelper->getEsiTtlParam();
@@ -288,6 +286,10 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
             }
 
             $esiUrl = Mage::getUrl( 'turpentine/esi/getBlock', $urlOptions );
+            if( $esiOptions[$methodParam] == 'esi' ) {
+                // setting [web/unsecure/base_url] can be https://... but ESI can never be HTTPS
+                $esiUrl = preg_replace( '|^https://|i', 'http://', $esiUrl );
+            }
             $blockObject->setEsiUrl( $esiUrl );
             // avoid caching the ESI template output to prevent the double-esi-
             // include/"ESI processing not enabled" bug
@@ -338,7 +340,11 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
             $esiData->setParentUrl( Mage::app()->getRequest()->getRequestString() );
         }
         if( is_array( $esiOptions['dummy_blocks'] ) ) {
-            $esiData->setDummyBlocks( $esiOptions['dummy_blocks'] );
+            $dummyBlocks = array();
+            foreach( $esiOptions['dummy_blocks'] as $key => $value ) {
+                $dummyBlocks[] = ( empty($value) && !is_numeric($key) ) ? $key : $value;
+            }
+            $esiData->setDummyBlocks( $dummyBlocks );
         } else {
             Mage::helper( 'turpentine/debug' )->logWarn(
                 'Invalid dummy_blocks for block: %s',
@@ -517,5 +523,30 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
      */
     protected function _checkIsEsiUrl( $url ) {
         return !$this->_checkIsNotEsiUrl( $url );
+    }
+
+    public function hookToControllerActionPreDispatch($observer) {
+        if(Mage::helper( 'turpentine/data')->getVclFix() == 0 && $observer->getEvent()->getControllerAction()->getFullActionName() == 'checkout_cart_add') {
+            Mage::dispatchEvent("add_to_cart_before", array('request' => $observer->getControllerAction()->getRequest()));
+        }
+    }
+
+    public function hookToControllerActionPostDispatch($observer) {
+        if($observer->getEvent()->getControllerAction()->getFullActionName() == 'checkout_cart_add') {
+            Mage::dispatchEvent("add_to_cart_after", array('request' => $observer->getControllerAction()->getRequest()));
+        }
+    }
+    
+    public function hookToAddToCartBefore($observer) {
+        //Mage::log("hookToAddToCartBefore-antes ".print_r($observer->getEvent()->getRequest()->getParams(),true)." will be added to cart.", null, 'carrinho.log', true);
+        $key = Mage::getSingleton('core/session')->getFormKey();
+        $observer->getEvent()->getRequest()->setParam('form_key', $key);
+        $request = $observer->getEvent()->getRequest()->getParams();
+        //Mage::log("hookToAddToCartBefore ".print_r($request,true)." will be added to cart.", null, 'carrinho.log', true);
+    }
+
+    public function hookToAddToCartAfter($observer) {
+        $request = $observer->getEvent()->getRequest()->getParams();
+        //Mage::log("hookToAddToCartAfter ".print_r($request,true)." is added to cart.", null, 'carrinho.log', true);
     }
 }
