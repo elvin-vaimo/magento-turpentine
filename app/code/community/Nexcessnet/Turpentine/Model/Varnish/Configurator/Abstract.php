@@ -201,6 +201,26 @@ abstract class Nexcessnet_Turpentine_Model_Varnish_Configurator_Abstract {
     }
 
     /**
+     * Get hosts as regex
+     *
+     * ex: base_url: example.com
+     *     path_regex: (example.com|example.net)
+     *
+     * @return string
+     */
+    public function getAllowedHostsRegex() {
+    	$hosts = array();
+    	foreach( Mage::app()->getStores() as $store ) {
+    		$hosts[] = parse_url( $store->getBaseUrl( Mage_Core_Model_Store::URL_TYPE_WEB , false ), PHP_URL_HOST );
+    	}
+    	 
+    	$hosts = array_values(array_unique( $hosts ));
+    	 
+        $pattern = '('.implode('|', array_map("preg_quote", $hosts)).')';
+    	return $pattern;
+    }
+    
+    /**
      * Get the base url path regex
      *
      * ex: base_url: http://example.com/magento/
@@ -272,10 +292,14 @@ abstract class Nexcessnet_Turpentine_Model_Varnish_Configurator_Abstract {
             'first_byte_timeout'    => $timeout . 's',
             'between_bytes_timeout' => $timeout . 's',
         );
-        return $this->_vcl_backend( 'default',
-            Mage::getStoreConfig( 'turpentine_vcl/backend/backend_host' ),
-            Mage::getStoreConfig( 'turpentine_vcl/backend/backend_port' ),
-            $default_options );
+        if ( Mage::getStoreConfigFlag( 'turpentine_vcl/backend/load_balancing' ) ) {
+            return $this->_vcl_director( 'default', $default_options );
+        } else {
+            return $this->_vcl_backend( 'default',
+                Mage::getStoreConfig( 'turpentine_vcl/backend/backend_host' ),
+                Mage::getStoreConfig( 'turpentine_vcl/backend/backend_port' ),
+                $default_options );
+        }
     }
 
     /**
@@ -289,10 +313,14 @@ abstract class Nexcessnet_Turpentine_Model_Varnish_Configurator_Abstract {
             'first_byte_timeout'    => $timeout . 's',
             'between_bytes_timeout' => $timeout . 's',
         );
-        return $this->_vcl_backend( 'admin',
-            Mage::getStoreConfig( 'turpentine_vcl/backend/backend_host' ),
-            Mage::getStoreConfig( 'turpentine_vcl/backend/backend_port' ),
-            $admin_options );
+        if ( Mage::getStoreConfigFlag( 'turpentine_vcl/backend/load_balancing' ) ) {
+            return $this->_vcl_director( 'admin', $admin_options );
+        } else {
+            return $this->_vcl_backend( 'admin',
+                Mage::getStoreConfig( 'turpentine_vcl/backend/backend_host' ),
+                Mage::getStoreConfig( 'turpentine_vcl/backend/backend_port' ),
+                $admin_options );
+        }
     }
 
     /**
@@ -325,6 +353,56 @@ abstract class Nexcessnet_Turpentine_Model_Varnish_Configurator_Abstract {
     protected function _getGetParamExcludes() {
         return implode( '|', Mage::helper( 'turpentine/data' )->cleanExplode( ',',
             Mage::getStoreConfig( 'turpentine_vcl/params/get_params' ) ) );
+    }
+
+    protected function _getIgnoreGetParameters()
+    {
+        /** @var Nexcessnet_Turpentine_Helper_Data $helper */
+        $helper = Mage::helper('turpentine');
+        $ignoredParameters = $helper->cleanExplode(',', Mage::getStoreConfig( 'turpentine_vcl/params/ignore_get_params'));
+        return implode( '|',  $ignoredParameters);
+    }
+
+    /**
+     * Get the Generate Session
+     *
+     * @return string
+     */
+    protected function _getGenerateSessionStart() {
+        return Mage::getStoreConfig( 'turpentine_varnish/general/vcl_fix' )
+            ? '/* -- REMOVED' : '';
+    }
+
+    /**
+     * Get the Generate Session
+     *
+     * @return string
+     */
+    protected function _getGenerateSessionEnd() {
+        return Mage::getStoreConfig( 'turpentine_varnish/general/vcl_fix' )
+            ? '-- */' : '';
+    }
+
+
+    /**
+     * Get the Generate Session
+     *
+     * @return string
+     */
+    protected function _getGenerateSession() {
+        return Mage::getStoreConfig( 'turpentine_varnish/general/vcl_fix' )
+            ? '# call generate_session' : 'call generate_session;';
+    }
+
+
+    /**
+     * Get the Generate Session Expires
+     *
+     * @return string
+     */
+    protected function _getGenerateSessionExpires() {
+        return Mage::getStoreConfig( 'turpentine_varnish/general/vcl_fix' )
+            ? '# call generate_session_expires' : 'call generate_session_expires;';
     }
 
     /**
@@ -496,9 +574,10 @@ abstract class Nexcessnet_Turpentine_Model_Varnish_Configurator_Abstract {
     /**
      * Format a VCL backend declaration
      *
-     * @param  string $name name of the backend
-     * @param  string $host backend host
-     * @param  string $port backend port
+     * @param  string $name    name of the backend
+     * @param  string $host    backend host
+     * @param  string $port    backend port
+     * @param  array  $options options
      * @return string
      */
     protected function _vcl_backend( $name, $host, $port, $options=array() ) {
@@ -519,6 +598,107 @@ EOS;
         }
         $str .= '}' . PHP_EOL;
         return $str;
+    }
+
+    /**
+     * Format a VCL director declaration, for load balancing
+     *
+     * @param string $name           name of the director, also used to select config settings
+     * @param array  $backendOptions options for each backend
+     * @return string
+     */
+    protected function _vcl_director( $name, $backendOptions ) {
+        $tpl = <<<EOS
+director {{name}} round-robin {
+{{backends}}
+}
+EOS;
+        if ( 'admin' == $name && 'yes_admin' == Mage::getStoreConfig( 'turpentine_vcl/backend/load_balancing' ) ) {
+            $backendNodes = Mage::helper( 'turpentine/data' )->cleanExplode( PHP_EOL,
+                Mage::getStoreConfig( 'turpentine_vcl/backend/backend_nodes_admin' ) );
+            $probeUrl = Mage::getStoreConfig( 'turpentine_vcl/backend/backend_probe_url_admin' );
+        } else {
+            $backendNodes = Mage::helper( 'turpentine/data' )->cleanExplode( PHP_EOL,
+                Mage::getStoreConfig( 'turpentine_vcl/backend/backend_nodes' ) );
+            $probeUrl = Mage::getStoreConfig( 'turpentine_vcl/backend/backend_probe_url' );
+        }
+        $backends = '';
+        foreach ( $backendNodes as $backendNode ) {
+            $parts = explode( ':', $backendNode, 2 );
+            $host = ( empty($parts[0]) ) ? '127.0.0.1' : $parts[0];
+            $port = ( empty($parts[1]) ) ? '80' : $parts[1];
+            $backends .= $this->_vcl_director_backend( $host, $port, $probeUrl, $backendOptions );
+        }
+        $vars = array(
+            'name' => $name,
+            'backends' => $backends
+        );
+        return $this->_formatTemplate( $tpl, $vars );
+    }
+
+    /**
+     * Format a VCL backend declaration to put inside director
+     *
+     * @param string $host     backend host
+     * @param string $port     backend port
+     * @param string $probeUrl URL to check if backend is up
+     * @param array  $options  extra options for backend
+     * @return string
+     */
+    protected function _vcl_director_backend( $host, $port, $probeUrl='', $options=array() ) {
+        $tpl = <<<EOS
+    {
+        .backend = {
+            .host = "{{host}}";
+            .port = "{{port}}";
+{{probe}}
+
+EOS;
+        $vars = array(
+            'host'  => $host,
+            'port'  => $port,
+            'probe' => ''
+        );
+        if ( !empty( $probeUrl ) ) {
+            $vars['probe'] = $this->_vcl_get_probe( $probeUrl );
+        }
+        $str = $this->_formatTemplate( $tpl, $vars );
+        foreach( $options as $key => $value ) {
+            $str .= sprintf( '            .%s = %s;', $key, $value ) . PHP_EOL;
+        }
+        $str .= <<<EOS
+        }
+    }
+EOS;
+        return $str;
+    }
+
+    /**
+     * Format a VCL probe declaration to put in backend which is in director
+     *
+     * @param string $probeUrl URL to check if backend is up
+     * @return string
+     */
+    protected function _vcl_get_probe( $probeUrl ) {
+        $urlParts = parse_url( $probeUrl );
+        if ( empty( $urlParts ) ) {
+            // Malformed URL
+            return '';
+        } else {
+            $tpl = <<<EOS
+            .probe = {
+                .request =
+                    "GET {{probe_path}} HTTP/1.1"
+                    "Host: {{probe_host}}"
+                    "Connection: close";
+            }
+EOS;
+            $vars = array(
+                'probe_host' => $urlParts['host'],
+                'probe_path' => $urlParts['path']
+            );
+            return $this->_formatTemplate( $tpl, $vars );
+        }
     }
 
     /**
@@ -586,7 +766,7 @@ if (req.http.Accept-Encoding) {
         } else if (req.http.Accept-Encoding ~ "deflate") {
             set req.http.Accept-Encoding = "deflate";
         } else {
-            # unkown algorithm
+            # unknown algorithm
             unset req.http.Accept-Encoding;
         }
     }
@@ -610,6 +790,26 @@ EOS;
     }
 
     /**
+     * Get the hostname for cookie normalization
+     *
+     * @return string
+     */
+    protected function _getNormalizeCookieTarget() {
+        return trim( Mage::getStoreConfig(
+            'turpentine_vcl/normalization/cookie_target' ) );
+    }
+
+    /**
+     * Get the regex for cookie normalization
+     *
+     * @return string
+     */
+    protected function _getNormalizeCookieRegex() {
+        return trim( Mage::getStoreConfig(
+            'turpentine_vcl/normalization/cookie_regex' ) );
+    }
+
+    /**
      * Build the list of template variables to apply to the VCL template
      *
      * @return array
@@ -621,13 +821,20 @@ EOS;
             'admin_frontname'   => $this->_getAdminFrontname(),
             'normalize_host_target' => $this->_getNormalizeHostTarget(),
             'url_base_regex'    => $this->getBaseUrlPathRegex(),
+        	'allowed_hosts_regex'	=> $this->getAllowedHostsRegex(),
             'url_excludes'  => $this->_getUrlExcludes(),
             'get_param_excludes'    => $this->_getGetParamExcludes(),
+            'get_param_ignored' => $this->_getIgnoreGetParameters(),
             'default_ttl'   => $this->_getDefaultTtl(),
             'enable_get_excludes'   => ($this->_getGetParamExcludes() ? 'true' : 'false'),
+            'enable_get_ignored' => ($this->_getIgnoreGetParameters() ? 'true' : 'false'),
             'debug_headers' => $this->_getEnableDebugHeaders(),
             'grace_period'  => $this->_getGracePeriod(),
             'force_cache_static'    => $this->_getForceCacheStatic(),
+            'generate_session_expires'    => $this->_getGenerateSessionExpires(),
+            'generate_session'    => $this->_getGenerateSession(),
+            'generate_session_start'    => $this->_getGenerateSessionStart(),
+            'generate_session_end'    => $this->_getGenerateSessionEnd(),
             'static_extensions' => $this->_getStaticExtensions(),
             'static_ttl'    => $this->_getStaticTtl(),
             'url_ttls'      => $this->_getUrlTtls(),
@@ -659,7 +866,13 @@ EOS;
         if( Mage::getStoreConfig( 'turpentine_vcl/normalization/host' ) ) {
             $vars['normalize_host'] = $this->_vcl_sub_normalize_host();
         }
-
+        if( Mage::getStoreConfig( 'turpentine_vcl/normalization/cookie_regex' ) ) {
+            $vars['normalize_cookie_regex'] = $this->_getNormalizeCookieRegex();
+        }
+        if( Mage::getStoreConfig( 'turpentine_vcl/normalization/cookie_target' ) ) {
+            $vars['normalize_cookie_target'] = $this->_getNormalizeCookieTarget();
+        }
+        
         $customIncludeFile = $this->_getCustomIncludeFilename();
         if( is_readable( $customIncludeFile ) ) {
             $vars['custom_vcl_include'] = file_get_contents( $customIncludeFile );
