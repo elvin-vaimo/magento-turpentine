@@ -325,6 +325,17 @@ class Nexcessnet_Turpentine_Helper_Data extends Mage_Core_Helper_Abstract {
         Varien_Profiler::start( 'turpentine::helper::data::_getChildBlockNames' );
         if( $blockNode instanceof Mage_Core_Model_Layout_Element ) {
             $blockNames = array( (string)$blockNode['name'] );
+
+            $parentBlockNode = $blockNode->xpath("parent::*");
+            if ($parentBlockNode) {
+                $parentBlockNode = reset($parentBlockNode);
+                if ($parentBlockNode->getName() == 'reference') {
+                    $name = (string)$parentBlockNode['name'];
+                    if ($name) {
+                        $blockNames[] = $name;
+                    }
+                }
+            }
             foreach( $blockNode->xpath( './block | ./reference' ) as $childBlockNode ) {
                 $blockNames = array_merge( $blockNames,
                     $this->_getChildBlockNames( $childBlockNode ) );
