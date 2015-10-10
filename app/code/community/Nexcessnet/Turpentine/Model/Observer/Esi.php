@@ -411,7 +411,7 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
         $blockNode = current( $layout->getNode()->xpath( sprintf(
             '//block[@name=\'%s\']',
             $block->getNameInLayout() ) ) );
-        $childBlocks = Mage::helper( 'turpentine/data' )
+        $childBlocks = Mage::helper( 'turpentine/data' )->setLayout($layout)
             ->getChildBlockNames( $blockNode );
         foreach( $childBlocks as $blockName ) {
             foreach( $layout->getUpdate()->getHandles() as $handle ) {
