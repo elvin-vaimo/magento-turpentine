@@ -452,7 +452,7 @@ class Nexcessnet_Turpentine_Model_Observer_Ban extends Varien_Event_Observer {
         $this->_tagsQueue += $tags;
     }
 
-    public function __destruc()
+    public function __destruct()
     {
         if (empty($this->_tagsQueue)) {
             return;
