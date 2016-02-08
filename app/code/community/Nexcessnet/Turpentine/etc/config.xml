@@ -412,6 +412,49 @@
                     </turpentine_cron_turpentine_ban_all_cache>
                 </observers>
             </turpentine_ban_all_cache>
+
+            <!-- PARTIAL PRODUCT REINDEX -->
+            <cataloginventory_stock_partial_reindex>
+                <observers>
+                    <turpentine_partial>
+                        <class>turpentine/observer_ban</class>
+                        <method>cleanProductsCacheAfterPartialReindex</method>
+                    </turpentine_partial>
+                </observers>
+            </cataloginventory_stock_partial_reindex>
+            <catalog_product_price_partial_reindex>
+                <observers>
+                    <turpentine_partial>
+                        <class>turpentine/observer_ban</class>
+                        <method>cleanProductsCacheAfterPartialReindex</method>
+                    </turpentine_partial>
+                </observers>
+            <catalog_url_category_partial_reindex>
+                <observers>
+                    <turpentine_partial>
+                        <class>turpentine/observer_ban</class>
+                        <method>cleanCategoriesCacheAfterPartialReindex</method>
+                    </turpentine_partial>
+                </observers>
+            </catalog_url_category_partial_reindex>
+            <catalog_url_category_reindex>
+                <observers>
+                    <turpentine_partial>
+                        <class>turpentine/observer_ban</class>
+                        <method>cleanCacheByTags</method>
+                    </turpentine_partial>
+                </observers>
+            </catalog_url_category_reindex>
+
+            <catalog_category_product_cat_partial_reindex>
+                <observers>
+                    <turpentine_partial>
+                        <class>turpentine/observer_ban</class>
+                        <method>cleanCategoriesCacheAfterPartialReindex</method>
+                    </turpentine_partial>
+                </observers>
+            </catalog_category_product_cat_partial_reindex>
+
         </events>
     </global>
     <frontend>
@@ -468,6 +511,15 @@
                     </add_to_cart_after>
                 </observers>
             </add_to_cart_after-->
+
+            <catalog_controller_category_init_after>
+                <observers>
+                    <turpentine>
+                        <class>turpentine/observer_esi</class>
+                        <method>categoryInitAfterSendHeader</method>
+                    </turpentine>
+                </observers>
+            </catalog_controller_category_init_after>
         </events>
     </frontend>
     <admin>
