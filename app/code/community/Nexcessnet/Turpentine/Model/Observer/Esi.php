@@ -58,6 +58,37 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
         $action->getResponse()->setHeader('X-Turpentine-Flush-Events', strtoupper(implode(',', $flushEvents)));
     }
 
+    public function productInitAfterSendHeader($observer)
+    {
+        /** @var Mage_Catalog_Model_Product $product */
+        $product = $observer->getProduct();
+        /** @var Mage_Catalog_ProductController $action */
+        $action = $observer->getControllerAction();
+        if (!$action || $action->getFullActionName() != 'catalog_product_view') {
+            return;
+        }
+
+        $flushEvents = $product->getCacheIdTags();
+
+        /** @var Mage_Bundle_Model_Product_Type|Mage_Catalog_Model_Product_Type_Configurable $typeInstance */
+        $typeInstance = $product->getTypeInstance(true);
+        if ($typeInstance instanceof Mage_Bundle_Model_Product_Type) {
+            // get option product ids
+        } elseif ($typeInstance instanceof Mage_Catalog_Model_Product_Type_Configurable) {
+            // get children product ids
+            $productIds = $typeInstance->getUsedProductIds($product);
+            foreach ($productIds as $productId) {
+                $flushEvents[] =  Mage_Catalog_Model_Product::CACHE_TAG . '_' . $productId;
+            }
+        }
+
+        if (empty($flushEvents)) {
+            return;
+        }
+
+        $action->getResponse()->setHeader('X-Turpentine-Flush-Events', strtoupper(implode(',', $flushEvents)));
+    }
+
     /**
      * Destroy the cookie with the customer group when customer logs out
      *
@@ -253,7 +284,7 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
                 $blockObject instanceof Mage_Core_Block_Template &&
                 $esiOptions = $blockObject->getEsiOptions() ) {
 
-            if ((isset($esiOptions['disableEsiInjection'])) && ($esiOptions['disableEsiInjection'] == 1)) { 
+            if ((isset($esiOptions['disableEsiInjection'])) && ($esiOptions['disableEsiInjection'] == 1)) {
                 return;
             }
 
@@ -561,7 +592,7 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
             Mage::dispatchEvent("add_to_cart_after", array('request' => $observer->getControllerAction()->getRequest()));
         }
     }
-    
+
     public function hookToAddToCartBefore($observer) {
         //Mage::log("hookToAddToCartBefore-antes ".print_r($observer->getEvent()->getRequest()->getParams(),true)." will be added to cart.", null, 'carrinho.log', true);
         $key = Mage::getSingleton('core/session')->getFormKey();

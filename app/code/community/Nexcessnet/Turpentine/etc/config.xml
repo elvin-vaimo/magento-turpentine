@@ -429,6 +429,7 @@
                         <method>cleanProductsCacheAfterPartialReindex</method>
                     </turpentine_partial>
                 </observers>
+            </catalog_product_price_partial_reindex>
             <catalog_url_category_partial_reindex>
                 <observers>
                     <turpentine_partial>
@@ -520,6 +521,14 @@
                     </turpentine>
                 </observers>
             </catalog_controller_category_init_after>
+            <catalog_controller_product_init_after>
+                <observers>
+                    <turpentine>
+                        <class>turpentine/observer_esi</class>
+                        <method>productInitAfterSendHeader</method>
+                    </turpentine>
+                </observers>
+            </catalog_controller_product_init_after>
         </events>
     </frontend>
     <admin>
