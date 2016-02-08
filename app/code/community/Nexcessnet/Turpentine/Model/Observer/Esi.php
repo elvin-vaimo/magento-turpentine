@@ -38,6 +38,26 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
         }
     }
 
+    public function categoryInitAfterSendHeader($observer)
+    {
+        if (!Mage::helper('turpentine/esi')->shouldResponseUseEsi()) {
+            return;
+        }
+        /** @var Mage_Catalog_CategoryController $action */
+        $action = $observer->getControllerAction();
+        if ($action->getFullActionName() != 'catalog_category_view') {
+            return;
+        }
+        /** @var Mage_Catalog_Model_Category $category */
+        $category = $observer->getCategory();
+        $flushEvents = $category->getCacheIdTags();
+        if (empty($flushEvents)) {
+            return;
+        }
+
+        $action->getResponse()->setHeader('X-Turpentine-Flush-Events', strtoupper(implode(',', $flushEvents)));
+    }
+
     /**
      * Destroy the cookie with the customer group when customer logs out
      *

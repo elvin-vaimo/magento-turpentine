@@ -36,6 +36,8 @@ class Nexcessnet_Turpentine_Model_Observer_Ban extends Varien_Event_Observer {
      */
     protected $_esiClearFlag    = array();
 
+    protected $_tagsQueue = array();
+
     /**
      * Clear the ESI block cache for a specific client
      *
@@ -331,6 +333,53 @@ class Nexcessnet_Turpentine_Model_Observer_Ban extends Varien_Event_Observer {
         return $this->_checkResult( $result );
     }
 
+
+    /**
+     * Clean cache for affected products
+     *
+     * @param Varien_Event_Observer $observer
+     */
+    public function cleanProductsCacheAfterPartialReindex(Varien_Event_Observer $observer)
+    {
+        if(!Mage::helper('turpentine/varnish')->getVarnishEnabled()) {
+            return;
+        }
+        $entityIds = $observer->getEvent()->getProductIds();
+        if (is_array($entityIds)) {
+            $this->_cleanProductsCache(Mage::getModel('catalog/product'), $entityIds);
+        }
+    }
+
+    /**
+     * Clean cache for affected categories
+     *
+     * @param Varien_Event_Observer $observer
+     */
+    public function cleanCategoriesCacheAfterPartialReindex(Varien_Event_Observer $observer)
+    {
+        if(!Mage::helper('turpentine/varnish')->getVarnishEnabled()) {
+            return;
+        }
+        $entityIds = $observer->getEvent()->getCategoryIds();
+        if (is_array($entityIds) && !empty($entityIds)) {
+            $this->_cleanEntityCache(Mage::getModel('catalog/category'), $entityIds);
+        }
+    }
+
+    /**
+     * Cleans cache by tags
+     *
+     * @param Varien_Event_Observer $observer
+     */
+    public function cleanCacheByTags(Varien_Event_Observer $observer)
+    {
+        $tags = $observer->getEvent()->getTags();
+
+        if (!empty($tags)) {
+            $this->_cleanByTags($tags);
+        }
+    }
+
     /**
      * Check a result from varnish admin action, log if result has errors
      *
@@ -360,5 +409,67 @@ class Nexcessnet_Turpentine_Model_Observer_Ban extends Varien_Event_Observer {
             $this->_varnishAdmin = Mage::getModel( 'turpentine/varnish_admin' );
         }
         return $this->_varnishAdmin;
+    }
+
+    /**
+     * Clean cache by specified entity and its ids
+     *
+     * @param Mage_Core_Model_Abstract $entity
+     * @param array $ids
+     */
+    protected function _cleanEntityCache(Mage_Core_Model_Abstract $entity, array $ids)
+    {
+        $cacheTags = array();
+        foreach ($ids as $entityId) {
+            $entity->setId($entityId);
+            $cacheTags = array_unique(array_merge($cacheTags, $entity->getCacheIdTags()));
+        }
+        if (!empty($cacheTags)) {
+            $this->_cleanByTags($cacheTags);
+        }
+    }
+
+    /**
+     * Clean cache by specified product and its ids
+     *
+     * @param Mage_Core_Model_Abstract $entity
+     * @param array $ids
+     */
+    protected function _cleanProductsCache(Mage_Core_Model_Abstract $entity, array $ids)
+    {
+        $cacheTags = array();
+        foreach ($ids as $entityId) {
+            $entity->setId($entityId);
+            $cacheTags = array_unique(array_merge($cacheTags, $entity->getCacheIdTagsWithCategories()));
+        }
+        if (!empty($cacheTags)) {
+            $this->_cleanByTags($cacheTags);
+        }
+    }
+
+    protected function _cleanByTags($tags)
+    {
+        $this->_tagsQueue += $tags;
+    }
+
+    public function __destruc()
+    {
+        if (empty($this->_tagsQueue)) {
+            return;
+        }
+
+        $this->_tagsQueue = array_unique($this->_tagsQueue);
+        $tags = array_diff($this->_tagsQueue, array(
+            Mage_Catalog_Model_Product::CACHE_TAG, Mage_Catalog_Model_Category::CACHE_TAG
+        ));
+
+        $chunks = array_chunk($tags, 10);
+        foreach ($chunks as $tagList) {
+            $parameters = array();
+            $parameters[] = 'obj.http.X-Turpentine-Flush-Events';
+            $parameters[] = '~';
+            $parameters[] = strtoupper(implode('|', $tagList));
+            call_user_func_array(array($this->_getVarnishAdmin(), 'flushExpression'), $parameters);
+        }
     }
 }
