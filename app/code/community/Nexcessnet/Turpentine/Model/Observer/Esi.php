@@ -74,9 +74,12 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
         $typeInstance = $product->getTypeInstance(true);
         if ($typeInstance instanceof Mage_Bundle_Model_Product_Type) {
             // get option product ids
+            // $productIds = Mage::getResourceSingleton('bundle/selection')->getChildrenIds($product->getId(), false);
         } elseif ($typeInstance instanceof Mage_Catalog_Model_Product_Type_Configurable) {
             // get children product ids
-            $productIds = $typeInstance->getUsedProductIds($product);
+            $productIds = Mage::getResourceSingleton('catalog/product_type_configurable')->getChildrenIds($product->getId(), false);
+            // from returned group array get the first one
+            $productIds = reset($productIds);
             foreach ($productIds as $productId) {
                 $flushEvents[] =  Mage_Catalog_Model_Product::CACHE_TAG . '_' . $productId;
             }
@@ -84,6 +87,11 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
 
         if (empty($flushEvents)) {
             return;
+        }
+
+        // don't allow the header to go too large
+        if (count($flushEvents) > 5) {
+            $flushEvents = array_slice($flushEvents, 0, 5);
         }
 
         $action->getResponse()->setHeader('X-Turpentine-Flush-Events', strtoupper(implode(',', $flushEvents)));
