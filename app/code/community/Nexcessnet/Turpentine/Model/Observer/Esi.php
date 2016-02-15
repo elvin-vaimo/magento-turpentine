@@ -590,7 +590,15 @@ class Nexcessnet_Turpentine_Model_Observer_Esi extends Varien_Event_Observer {
     }
 
     public function hookToControllerActionPreDispatch($observer) {
-        if(Mage::helper( 'turpentine/data')->getVclFix() == 0 && $observer->getEvent()->getControllerAction()->getFullActionName() == 'checkout_cart_add') {
+        /** @var Mage_Core_Controller_Varien_Action $action */
+        $action = $observer->getEvent()->getControllerAction();
+        if (isset($_COOKIE['customer_group']) && $action->getRequest()->getRouteName() != 'account') {
+            if (!Mage::getSingleton('customer/session')->isLoggedIn()) {
+                Mage::getSingleton('core/cookie')->delete('customer_group');
+                unset($_COOKIE['customer_group']);
+            }
+        }
+        if(Mage::helper( 'turpentine/data')->getVclFix() == 0 && $action->getFullActionName() == 'checkout_cart_add') {
             Mage::dispatchEvent("add_to_cart_before", array('request' => $observer->getControllerAction()->getRequest()));
         }
     }
