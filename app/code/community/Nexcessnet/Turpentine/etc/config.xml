@@ -129,7 +129,7 @@
             </core>
             -->
             <!--
-            Rewrite the poll ActivePoll block, as it uses its own custom 
+            Rewrite the poll ActivePoll block, as it uses its own custom
             template setting methods.
             -->
             <poll>
@@ -139,7 +139,7 @@
             </poll>
 
             <!--
-            Rewrite the compared and viewed product block. Default behavior returns '' if 
+            Rewrite the compared and viewed product block. Default behavior returns '' if
             no items to display, which prevents display of the ESI url, causing caching problems
             -->
             <reports>
@@ -426,6 +426,22 @@
                     </turpentine_partial>
                 </observers>
             </cataloginventory_stock_partial_reindex>
+            <catalog_category_product_partial_reindex>
+                <observers>
+                    <turpentine_partial>
+                        <class>turpentine/observer_ban</class>
+                        <method>cleanProductsCacheAfterPartialReindex</method>
+                    </turpentine_partial>
+                </observers>
+            </catalog_category_product_partial_reindex>
+            <catalog_product_flat_partial_reindex>
+                <observers>
+                    <turpentine_partial>
+                        <class>turpentine/observer_ban</class>
+                        <method>cleanProductsCacheAfterPartialReindex</method>
+                    </turpentine_partial>
+                </observers>
+            </catalog_product_flat_partial_reindex>
             <catalog_product_price_partial_reindex>
                 <observers>
                     <turpentine_partial>
@@ -459,6 +475,14 @@
                     </turpentine_partial>
                 </observers>
             </catalog_category_product_cat_partial_reindex>
+            <catalog_category_flat_partial_reindex>
+                <observers>
+                    <turpentine_partial>
+                        <class>turpentine/observer_ban</class>
+                        <method>cleanCategoriesCacheAfterPartialReindex</method>
+                    </turpentine_partial>
+                </observers>
+            </catalog_category_flat_partial_reindex>
 
         </events>
     </global>
